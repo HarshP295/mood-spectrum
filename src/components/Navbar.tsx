@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Heart, Home, BookOpen, BarChart3, MessageCircle, Music, Camera, User } from 'lucide-react';
+import { Heart, Home, BookOpen, BarChart3, MessageCircle, Music, Camera } from 'lucide-react';
 import DarkModeToggle from './DarkModeToggle';
 
 const Navbar = () => {
@@ -46,15 +46,8 @@ const Navbar = () => {
             ))}
           </div>
 
-          {/* Profile & Dark Mode Toggle */}
+          {/* Dark Mode Toggle */}
           <div className="flex items-center space-x-4">
-            <Link
-              to="/login"
-              className="flex items-center space-x-2 px-4 py-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-all duration-300"
-            >
-              <User className="w-4 h-4" />
-              <span className="hidden sm:inline text-sm font-medium">Profile</span>
-            </Link>
             <DarkModeToggle />
           </div>
         </div>

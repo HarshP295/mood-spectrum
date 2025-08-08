@@ -52,6 +52,11 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
+				// Therapeutic color palette
+				peach: 'hsl(var(--peach))',
+				yellow: 'hsl(var(--yellow))',
+				'lavender-light': 'hsl(var(--lavender-light))',
+				'pink-soft': 'hsl(var(--pink-soft))',
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
 					foreground: 'hsl(var(--sidebar-foreground))',
@@ -66,7 +71,23 @@ export default {
 			borderRadius: {
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',
-				sm: 'calc(var(--radius) - 4px)'
+				sm: 'calc(var(--radius) - 4px)',
+				'2xl': '1rem',
+				'3xl': '1.5rem'
+			},
+			boxShadow: {
+				'soft': 'var(--shadow-soft)',
+				'card': 'var(--shadow-card)',
+				'therapeutic': 'var(--shadow-therapeutic)'
+			},
+			backgroundImage: {
+				'gradient-primary': 'var(--gradient-primary)',
+				'gradient-calm': 'var(--gradient-calm)',
+				'gradient-therapeutic': 'var(--gradient-therapeutic)'
+			},
+			transitionTimingFunction: {
+				'smooth': 'cubic-bezier(0.4, 0, 0.2, 1)',
+				'therapeutic': 'cubic-bezier(0.25, 0.1, 0.25, 1)'
 			},
 			keyframes: {
 				'accordion-down': {
@@ -84,11 +105,31 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'therapeutic-pulse': {
+					'0%, 100%': { opacity: '1', transform: 'scale(1)' },
+					'50%': { opacity: '0.8', transform: 'scale(1.05)' }
+				},
+				'mood-float': {
+					'0%, 100%': { transform: 'translateY(0px)' },
+					'50%': { transform: 'translateY(-10px)' }
+				},
+				'gentle-bounce': {
+					'0%, 100%': { transform: 'translateY(0px)' },
+					'50%': { transform: 'translateY(-5px)' }
+				},
+				'fade-in': {
+					'0%': { opacity: '0', transform: 'translateY(10px)' },
+					'100%': { opacity: '1', transform: 'translateY(0)' }
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'therapeutic-pulse': 'therapeutic-pulse 3s ease-in-out infinite',
+				'mood-float': 'mood-float 6s ease-in-out infinite',
+				'gentle-bounce': 'gentle-bounce 2s ease-in-out infinite',
+				'fade-in': 'fade-in 0.3s ease-out'
 			}
 		}
 	},

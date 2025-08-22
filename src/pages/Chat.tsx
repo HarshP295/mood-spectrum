@@ -1,44 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Users, Heart, MessageCircle } from 'lucide-react';
+import { Send, Users, Shield, Hash } from 'lucide-react';
 import ChatBubble from '../components/ChatBubble';
 import Button from '../components/Button';
 import Card from '../components/Card';
-
-interface Message {
-  id: number;
-  content: string;
-  isUser: boolean;
-  timestamp: string;
-  avatar?: string;
-}
+import { useChat } from '../contexts/ChatContext';
 
 const Chat = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      content: "Hi everyone! I'm feeling a bit anxious about starting a new job next week. Any advice?",
-      isUser: false,
-      timestamp: "2:30 PM",
-      avatar: "A"
-    },
-    {
-      id: 2,
-      content: "That's totally normal! I felt the same way. Remember that they hired you for a reason - you've got this! 💪",
-      isUser: false,
-      timestamp: "2:32 PM",
-      avatar: "B"
-    },
-    {
-      id: 3,
-      content: "Thank you! That really helps to hear. Sometimes we just need that reminder.",
-      isUser: false,
-      timestamp: "2:35 PM",
-      avatar: "A"
-    }
-  ]);
-  
+  const { state: chatState, sendMessage, joinRoom } = useChat();
   const [newMessage, setNewMessage] = useState('');
-  const [onlineUsers] = useState(12);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -47,50 +16,13 @@ const Chat = () => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [chatState.messages]);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!newMessage.trim()) return;
 
-    const message: Message = {
-      id: Date.now(),
-      content: newMessage,
-      isUser: true,
-      timestamp: new Date().toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        hour12: true 
-      })
-    };
-
-    setMessages(prev => [...prev, message]);
+    await sendMessage(newMessage);
     setNewMessage('');
-
-    // Simulate responses from other users
-    setTimeout(() => {
-      const responses = [
-        "Thank you for sharing that. You're very brave!",
-        "I completely understand how you're feeling.",
-        "That's a great perspective. Thanks for the insight!",
-        "Sending positive vibes your way! 🌟",
-        "We're all here to support each other. ❤️"
-      ];
-      
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-      const responseMessage: Message = {
-        id: Date.now() + 1,
-        content: randomResponse,
-        isUser: false,
-        timestamp: new Date().toLocaleTimeString('en-US', { 
-          hour: 'numeric', 
-          minute: '2-digit',
-          hour12: true 
-        }),
-        avatar: String.fromCharCode(65 + Math.floor(Math.random() * 26))
-      };
-      
-      setMessages(prev => [...prev, responseMessage]);
-    }, 1000 + Math.random() * 2000);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -100,13 +32,19 @@ const Chat = () => {
     }
   };
 
-  const supportTopics = [
-    "I'm feeling overwhelmed today",
-    "Looking for study motivation",
-    "Dealing with social anxiety",
-    "Need someone to talk to",
-    "Celebrating a small win!"
-  ];
+  const formatTimestamp = (timestamp: number) => {
+    return new Date(timestamp).toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    });
+  };
+
+  const getAvatarLetter = (sender: string, index: number) => {
+    if (sender === 'user') return 'You';
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    return letters[index % letters.length];
+  };
 
   return (
     <div className="min-h-screen bg-background py-8">
@@ -114,110 +52,178 @@ const Chat = () => {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-block p-4 bg-gradient-primary rounded-full mb-4 therapeutic-pulse">
-            <MessageCircle className="w-8 h-8 text-white" />
+            <Users className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-4xl font-bold text-foreground mb-4">Peer Support Chat</h1>
+          <h1 className="text-4xl font-bold text-foreground mb-4">Anonymous Peer Support</h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Connect with others in a safe, anonymous environment where everyone understands.
+            Connect with others in a safe, anonymous environment. Share experiences and find support.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Online Users */}
-            <Card variant="default" className="p-6">
-              <div className="flex items-center space-x-2 mb-4">
-                <Users className="w-5 h-5 text-primary" />
-                <h3 className="font-semibold text-foreground">Community</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Chat Rooms Sidebar */}
+          <div className="lg:col-span-1">
+            <Card variant="default" className="p-6 h-fit">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-foreground">Support Rooms</h3>
+                <div className="flex items-center text-sm text-muted-foreground">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                  {chatState.onlineUsers} online
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-sm text-muted-foreground">{onlineUsers} people online</span>
-              </div>
-            </Card>
-
-            {/* Quick Topics */}
-            <Card variant="therapeutic" className="p-6">
-              <h3 className="font-semibold text-white mb-4">Quick Topics</h3>
+              
               <div className="space-y-2">
-                {supportTopics.map((topic, index) => (
+                {chatState.rooms.map((room) => (
                   <button
-                    key={index}
-                    onClick={() => setNewMessage(topic)}
-                    className="w-full text-left p-3 bg-white/20 rounded-lg text-white/90 hover:bg-white/30 transition-colors duration-200 text-sm"
+                    key={room.id}
+                    onClick={() => joinRoom(room.id)}
+                    className={`w-full text-left p-3 rounded-xl transition-all duration-200 ${
+                      chatState.currentRoom === room.id
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted hover:bg-muted/80 text-foreground'
+                    }`}
                   >
-                    {topic}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Hash className="w-4 h-4" />
+                        <span className="font-medium text-sm">{room.name}</span>
+                      </div>
+                      <span className="text-xs opacity-70">{room.memberCount}</span>
+                    </div>
+                    <p className="text-xs opacity-70 mt-1 line-clamp-1">
+                      {room.description}
+                    </p>
                   </button>
                 ))}
               </div>
-            </Card>
 
-            {/* Community Guidelines */}
-            <Card variant="default" className="p-6">
-              <div className="flex items-center space-x-2 mb-4">
-                <Heart className="w-5 h-5 text-accent" />
-                <h3 className="font-semibold text-foreground">Guidelines</h3>
+              {/* Safety Notice */}
+              <div className="mt-6 p-4 bg-muted rounded-xl">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Shield className="w-5 h-5 text-primary" />
+                  <span className="text-sm font-semibold text-foreground">Safe Space</span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  This is a moderated, anonymous space. Please be respectful and supportive. 
+                  If you need immediate help, contact emergency services.
+                </p>
               </div>
-              <ul className="text-sm text-muted-foreground space-y-2">
-                <li>• Be kind and supportive</li>
-                <li>• Respect privacy</li>
-                <li>• No judgment zone</li>
-                <li>• Listen actively</li>
-                <li>• Share your experiences</li>
-              </ul>
             </Card>
           </div>
 
-          {/* Chat Area */}
+          {/* Main Chat Area */}
           <div className="lg:col-span-3">
-            <Card variant="default" className="flex flex-col h-[600px]">
+            <Card variant="default" className="h-[600px] flex flex-col">
               {/* Chat Header */}
-              <div className="p-6 border-b border-border">
-                <h3 className="font-semibold text-foreground">Anonymous Support Chat</h3>
-                <p className="text-sm text-muted-foreground">Everyone here understands what you're going through</p>
+              <div className="p-4 border-b border-border">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Hash className="w-5 h-5 text-primary" />
+                    <div>
+                      <h3 className="font-semibold text-foreground">
+                        {chatState.rooms.find(r => r.id === chatState.currentRoom)?.name}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {chatState.rooms.find(r => r.id === chatState.currentRoom)?.description}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                    <Users className="w-4 h-4" />
+                    <span>{chatState.onlineUsers} online</span>
+                    <div className={`w-2 h-2 rounded-full ${
+                      chatState.isConnected ? 'bg-green-500' : 'bg-red-500'
+                    }`}></div>
+                  </div>
+                </div>
               </div>
 
-              {/* Messages */}
-              <div className="flex-1 p-6 overflow-y-auto space-y-4">
-                {messages.map((message) => (
-                  <ChatBubble
-                    key={message.id}
-                    isUser={message.isUser}
-                    timestamp={message.timestamp}
-                    avatar={message.avatar}
-                  >
-                    {message.content}
-                  </ChatBubble>
-                ))}
+              {/* Messages Area */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {chatState.loading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-2"></div>
+                      <p className="text-muted-foreground">Connecting to chat...</p>
+                    </div>
+                  </div>
+                ) : chatState.messages.length === 0 ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold text-foreground mb-2">Start the conversation</h3>
+                      <p className="text-muted-foreground">Be the first to share and connect with others.</p>
+                    </div>
+                  </div>
+                ) : (
+                  chatState.messages.map((message, index) => (
+                    <ChatBubble
+                      key={message.id}
+                      isUser={message.sender === 'user'}
+                      timestamp={formatTimestamp(message.timestamp)}
+                      avatar={message.sender === 'user' ? 'You' : getAvatarLetter(message.sender, index)}
+                    >
+                      {message.content}
+                    </ChatBubble>
+                  ))
+                )}
                 <div ref={messagesEndRef} />
               </div>
 
               {/* Message Input */}
-              <div className="p-6 border-t border-border">
-                <div className="flex space-x-4">
-                  <div className="flex-1">
-                    <textarea
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      placeholder="Type your message... (Press Enter to send)"
-                      className="input-therapeutic w-full h-12 resize-none"
-                      rows={1}
-                    />
-                  </div>
+              <div className="p-4 border-t border-border">
+                <div className="flex space-x-2">
+                  <textarea
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Share your thoughts or ask for support..."
+                    className="input-therapeutic flex-1 resize-none min-h-[80px] max-h-32"
+                    rows={2}
+                  />
                   <Button
                     onClick={handleSendMessage}
                     variant="therapeutic"
-                    disabled={!newMessage.trim()}
-                    className="px-4"
+                    disabled={!newMessage.trim() || !chatState.isConnected}
+                    className="self-end"
                   >
-                    <Send className="w-5 h-5" />
+                    <Send className="w-4 h-4" />
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Your identity is completely anonymous. Share what feels comfortable.
-                </p>
+                
+                {!chatState.isConnected && (
+                  <p className="text-sm text-destructive mt-2">
+                    Disconnected from chat. Trying to reconnect...
+                  </p>
+                )}
+                
+                <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+                  <span>Press Enter to send, Shift+Enter for new line</span>
+                  <span>{newMessage.length}/500</span>
+                </div>
+              </div>
+            </Card>
+
+            {/* Community Guidelines */}
+            <Card variant="default" className="mt-6 p-6">
+              <h3 className="text-lg font-semibold text-foreground mb-4">Community Guidelines</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-muted-foreground">
+                <div>
+                  <h4 className="font-medium text-foreground mb-2">Be Respectful</h4>
+                  <p>Treat everyone with kindness and respect. We're all here to support each other.</p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-foreground mb-2">Stay Anonymous</h4>
+                  <p>Don't share personal information. Keep conversations general and supportive.</p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-foreground mb-2">No Medical Advice</h4>
+                  <p>Share experiences, not medical advice. Encourage professional help when needed.</p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-foreground mb-2">Crisis Support</h4>
+                  <p>If you're in crisis, please contact emergency services or a crisis hotline immediately.</p>
+                </div>
               </div>
             </Card>
           </div>

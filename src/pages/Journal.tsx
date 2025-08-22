@@ -3,47 +3,56 @@ import { Save, Calendar, Sparkles } from 'lucide-react';
 import MoodSelector from '../components/MoodSelector';
 import Button from '../components/Button';
 import Card from '../components/Card';
+import { useMood } from '../contexts/MoodContext';
+import { useApp } from '../contexts/AppContext';
 
 const Journal = () => {
-  const [selectedMood, setSelectedMood] = useState<string>('');
+  const { state: moodState, addEntry, setCurrentMood } = useMood();
+  const { addNotification } = useApp();
   const [journalEntry, setJournalEntry] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [savedEntries, setSavedEntries] = useState<Array<{
-    id: number;
-    mood: string;
-    entry: string;
-    date: string;
-  }>>([]);
 
   const handleSave = async () => {
-    if (!selectedMood || !journalEntry.trim()) {
-      alert('Please select a mood and write your thoughts before saving.');
+    if (!moodState.currentMood || !journalEntry.trim()) {
+      addNotification({
+        type: 'warning',
+        title: 'Incomplete Entry',
+        message: 'Please select a mood and write your thoughts before saving.',
+      });
       return;
     }
 
-    setIsSaving(true);
-    
-    // Simulate saving delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const newEntry = {
-      id: Date.now(),
-      mood: selectedMood,
-      entry: journalEntry,
-      date: new Date().toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      })
+    try {
+      // Get mood intensity (simplified mapping)
+      const moodIntensity = getMoodIntensity(moodState.currentMood);
+      
+      await addEntry(moodState.currentMood, moodIntensity, journalEntry);
+      
+      setCurrentMood('');
+      setJournalEntry('');
+      
+      addNotification({
+        type: 'success',
+        title: 'Entry Saved!',
+        message: 'Your journal entry has been saved successfully.',
+      });
+    } catch (error) {
+      addNotification({
+        type: 'error',
+        title: 'Save Failed',
+        message: 'Failed to save your entry. Please try again.',
+      });
+    }
+  };
+
+  const getMoodIntensity = (mood: string): number => {
+    const intensityMap: Record<string, number> = {
+      happy: 8,
+      excited: 9,
+      neutral: 5,
+      sad: 3,
+      anxious: 4,
     };
-    
-    setSavedEntries(prev => [newEntry, ...prev]);
-    setSelectedMood('');
-    setJournalEntry('');
-    setIsSaving(false);
-    
-    alert('Entry saved successfully!');
+    return intensityMap[mood] || 5;
   };
 
   const journalPrompts = [
@@ -73,7 +82,7 @@ const Journal = () => {
           <div className="lg:col-span-2 space-y-8">
             {/* Mood Selection */}
             <Card variant="default" className="p-6">
-              <MoodSelector onMoodSelect={setSelectedMood} selectedMood={selectedMood} />
+              <MoodSelector onMoodSelect={setCurrentMood} selectedMood={moodState.currentMood} />
             </Card>
 
             {/* Journal Entry */}
@@ -107,9 +116,9 @@ const Journal = () => {
                   <Button
                     onClick={handleSave}
                     variant="therapeutic"
-                    disabled={isSaving || !selectedMood || !journalEntry.trim()}
+                    disabled={moodState.loading || !moodState.currentMood || !journalEntry.trim()}
                   >
-                    {isSaving ? (
+                    {moodState.loading ? (
                       <div className="flex items-center">
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
                         Saving...
@@ -145,11 +154,11 @@ const Journal = () => {
             </Card>
 
             {/* Recent Entries */}
-            {savedEntries.length > 0 && (
+            {moodState.entries.length > 0 && (
               <Card variant="default" className="p-6">
                 <h3 className="text-lg font-semibold text-foreground mb-4">Recent Entries</h3>
                 <div className="space-y-3 max-h-64 overflow-y-auto">
-                  {savedEntries.slice(0, 3).map((entry) => (
+                  {moodState.entries.slice(0, 3).map((entry) => (
                     <div key={entry.id} className="p-3 bg-muted rounded-xl">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-foreground capitalize">
@@ -160,7 +169,7 @@ const Journal = () => {
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground line-clamp-2">
-                        {entry.entry}
+                        {entry.note}
                       </p>
                     </div>
                   ))}

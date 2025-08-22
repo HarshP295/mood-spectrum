@@ -3,25 +3,36 @@ import { TrendingUp, Calendar, Brain, Target, RefreshCw } from 'lucide-react';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import useDailyTips from '../hooks/useDailyTips';
+import { useMood } from '../contexts/MoodContext';
 
 const Dashboard = () => {
   const { tips, loading, refreshTips } = useDailyTips();
-  const [moodData] = useState([
-    { day: 'Mon', mood: 'happy', value: 8 },
-    { day: 'Tue', mood: 'neutral', value: 6 },
-    { day: 'Wed', mood: 'sad', value: 4 },
-    { day: 'Thu', mood: 'happy', value: 7 },
-    { day: 'Fri', mood: 'excited', value: 9 },
-    { day: 'Sat', mood: 'calm', value: 8 },
-    { day: 'Sun', mood: 'happy', value: 8 },
-  ]);
+  const { state: moodState } = useMood();
 
-  const [stats] = useState({
-    avgMood: 7.1,
-    entriesThisWeek: 5,
-    streakDays: 12,
-    improvementScore: 85
-  });
+  // Use real mood data from context, fallback to mock data
+  const moodData = moodState.stats.moodTrends.length > 0 
+    ? moodState.stats.moodTrends.map((trend, index) => ({
+        day: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][index] || trend.date.slice(-3),
+        mood: trend.mood,
+        value: trend.intensity
+      }))
+    : [
+        { day: 'Mon', mood: 'happy', value: 8 },
+        { day: 'Tue', mood: 'neutral', value: 6 },
+        { day: 'Wed', mood: 'sad', value: 4 },
+        { day: 'Thu', mood: 'happy', value: 7 },
+        { day: 'Fri', mood: 'excited', value: 9 },
+        { day: 'Sat', mood: 'calm', value: 8 },
+        { day: 'Sun', mood: 'happy', value: 8 },
+      ];
+
+  // Use real stats from context
+  const stats = {
+    avgMood: moodState.stats.averageMood || 7.1,
+    entriesThisWeek: moodState.stats.entriesThisWeek || 0,
+    streakDays: moodState.stats.streakDays || 0,
+    improvementScore: 85 // This could be calculated based on mood trends
+  };
 
   const getMoodColor = (mood: string) => {
     const colors = {

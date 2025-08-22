@@ -1,17 +1,22 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, Heart } from 'lucide-react';
 import Button from '../components/Button';
 import Card from '../components/Card';
+import { useAuth } from '../contexts/AuthContext';
+import { useApp } from '../contexts/AppContext';
 
 const Login = () => {
+  const navigate = useNavigate();
+  const { login, state: authState, clearError } = useAuth();
+  const { addNotification } = useApp();
+  
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isLoading, setIsLoading] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -47,17 +52,21 @@ const Login = () => {
     
     if (!validateForm()) return;
     
-    setIsLoading(true);
+    clearError();
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Simulate successful login
-    console.log('Login successful:', formData);
-    setIsLoading(false);
-    
-    // In a real app, you would redirect or update auth state here
-    alert('Login successful! (This is a demo)');
+    try {
+      await login(formData.email, formData.password);
+      
+      addNotification({
+        type: 'success',
+        title: 'Welcome back!',
+        message: 'You have been successfully logged in.',
+      });
+      
+      navigate('/dashboard');
+    } catch (error) {
+      // Error is handled by the auth context
+    }
   };
 
   return (
@@ -142,9 +151,9 @@ const Login = () => {
               variant="therapeutic"
               size="lg"
               className="w-full"
-              disabled={isLoading}
+              disabled={authState.loading}
             >
-              {isLoading ? (
+              {authState.loading ? (
                 <div className="flex items-center justify-center">
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
                   Signing in...

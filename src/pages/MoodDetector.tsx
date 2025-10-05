@@ -1,17 +1,30 @@
 import { Camera, Play, Square, RefreshCw, Zap } from 'lucide-react';
 import Button from '../components/Button';
 import Card from '../components/Card';
+// Using fake mood detector for random emotion detection
 import useFakeMoodDetector from '../hooks/useFakeMoodDetector';
+import { useAuth } from '@/contexts/AuthContext';
 
 const MoodDetector = () => {
-  const { 
-    detection, 
-    isDetecting, 
-    cameraActive, 
-    startDetection, 
-    stopCamera, 
-    resetDetection 
-  } = useFakeMoodDetector();
+  const { state } = useAuth();
+  const { ready, videoRef, detection, isDetecting, cameraActive, error, start, stop, reset, status, isPlaying, resumePlayback, isRecording, startRecording, stopAndExportRecording, detectEmotion } = useFakeMoodDetector();
+
+  const saveToJournal = async () => {
+    if (!detection) return;
+    const token = localStorage.getItem('mindflow_token');
+    const res = await fetch('/api/journal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
+      body: JSON.stringify({
+        title: `Mood snapshot: ${detection.mood}`,
+        content: `Detected mood: ${detection.mood} (${detection.confidence}% confidence).`,
+        mood: detection.mood,
+      }),
+    });
+    if (!res.ok) {
+      console.warn('Failed to save journal entry');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background py-8">
@@ -37,7 +50,7 @@ const MoodDetector = () => {
               </p>
             </div>
 
-            {/* Mock Camera View */}
+            {/* Live Camera View */}
             <div className="relative bg-gradient-to-br from-muted to-secondary rounded-2xl overflow-hidden mb-6" style={{ aspectRatio: '4/3' }}>
               {!cameraActive ? (
                 /* Camera Off State */
@@ -49,32 +62,39 @@ const MoodDetector = () => {
                   </div>
                 </div>
               ) : (
-                /* Camera Active State */
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20">
-                  <div className="absolute inset-4 border-2 border-white/50 rounded-lg">
-                    {/* Face Detection Frame */}
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                      <div className="w-32 h-40 border-2 border-primary rounded-lg animate-pulse">
-                        <div className="w-full h-full bg-primary/10 rounded-lg flex items-center justify-center">
-                          <span className="text-2xl">👤</span>
-                        </div>
-                      </div>
+                <div className="absolute inset-0">
+                  <video 
+                    ref={videoRef} 
+                    className="w-full h-full object-cover bg-black" 
+                    muted 
+                    playsInline 
+                    autoPlay
+                    style={{ transform: 'scaleX(-1)' }}
+                  />
+                  {!isPlaying && (
+                    <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-auto">
+                      <button 
+                        onClick={resumePlayback} 
+                        className="px-4 py-3 text-sm rounded-lg bg-white/30 text-white backdrop-blur hover:bg-white/40 transition-colors cursor-pointer"
+                      >
+                        Tap to start video
+                      </button>
                     </div>
-                  </div>
-                  
-                  {/* Recording Indicator */}
-                  <div className="absolute top-4 left-4 flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                    <span className="text-white text-sm font-medium">Recording</span>
-                  </div>
-
-                  {/* Processing Overlay */}
+                  )}
                   {isDetecting && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center pointer-events-none z-10">
                       <div className="text-center text-white">
                         <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
                         <p className="font-medium">Analyzing facial expressions...</p>
-                        <p className="text-sm opacity-80 mt-1">Please stay still</p>
+                        <p className="text-xs opacity-80 mt-1">{status}</p>
+                      </div>
+                    </div>
+                  )}
+                  {error && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <div className="text-center text-white">
+                        <p className="font-semibold">{error}</p>
+                        <p className="text-xs opacity-80 mt-1">Ensure camera permission and face models are present.</p>
                       </div>
                     </div>
                   )}
@@ -86,35 +106,35 @@ const MoodDetector = () => {
             <div className="flex space-x-3">
               {!cameraActive ? (
                 <Button
-                  onClick={startDetection}
+                  onClick={start}
                   variant="therapeutic"
                   size="lg"
                   className="flex-1"
-                  disabled={isDetecting}
+                  disabled={!ready || isDetecting}
                 >
                   <Play className="w-5 h-5 mr-2" />
-                  Start Detection
+                  Start Camera
                 </Button>
               ) : (
                 <>
                   <Button
-                    onClick={stopCamera}
-                    variant="secondary"
+                    onClick={detectEmotion}
+                    variant="therapeutic"
                     size="lg"
                     className="flex-1"
+                    disabled={isDetecting}
+                  >
+                    <Zap className="w-5 h-5 mr-2" />
+                    {isDetecting ? 'Detecting...' : 'Detect Emotion'}
+                  </Button>
+                  <Button
+                    onClick={stop}
+                    variant="secondary"
+                    size="lg"
                   >
                     <Square className="w-5 h-5 mr-2" />
                     Stop Camera
                   </Button>
-                  {detection && (
-                    <Button
-                      onClick={resetDetection}
-                      variant="outline"
-                      size="lg"
-                    >
-                      <RefreshCw className="w-5 h-5" />
-                    </Button>
-                  )}
                 </>
               )}
             </div>
@@ -148,6 +168,11 @@ const MoodDetector = () => {
                       </div>
                     ))}
                   </div>
+                  {state.isAuthenticated && (
+                    <div className="mt-4">
+                      <Button variant="therapeutic" onClick={saveToJournal}>Save mood to Journal</Button>
+                    </div>
+                  )}
                 </Card>
               </>
             ) : (
@@ -177,12 +202,11 @@ const MoodDetector = () => {
               </Card>
             )}
 
-            {/* Demo Notice */}
+            {/* Privacy Notice */}
             <Card variant="therapeutic" className="p-6">
-              <h4 className="text-lg font-semibold text-white mb-2">Demo Mode</h4>
+              <h4 className="text-lg font-semibold text-white mb-2">Privacy</h4>
               <p className="text-white/80 text-sm leading-relaxed">
-                This is a simulated mood detection system. In a real implementation, this would use computer vision 
-                and machine learning to analyze facial expressions and micro-expressions for accurate mood detection.
+                Processing runs locally in your browser. No camera frames are uploaded.
               </p>
             </Card>
           </div>

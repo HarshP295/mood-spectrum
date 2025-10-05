@@ -42,7 +42,7 @@ const Chat = () => {
 
   const getAvatarLetter = (sender: string, index: number) => {
     if (sender === 'user') return 'You';
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const letters = 'A';
     return letters[index % letters.length];
   };
 

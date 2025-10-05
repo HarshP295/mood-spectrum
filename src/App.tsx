@@ -16,6 +16,7 @@ import Chat from "./pages/Chat";
 import Playlist from "./pages/Playlist";
 import MoodDetector from "./pages/MoodDetector";
 import NotFound from "./pages/NotFound";
+import Admin from "./pages/Admin";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ const App = () => (
                   <Route path="/chat" element={<Chat />} />
                   <Route path="/playlist" element={<Playlist />} />
                   <Route path="/mood-detector" element={<MoodDetector />} />
+                  <Route path="/admin" element={<Admin />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>

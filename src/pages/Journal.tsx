@@ -1,18 +1,66 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Save, Calendar, Sparkles } from 'lucide-react';
 import MoodSelector from '../components/MoodSelector';
 import Button from '../components/Button';
 import Card from '../components/Card';
-import { useMood } from '../contexts/MoodContext';
 import { useApp } from '../contexts/AppContext';
 
 const Journal = () => {
-  const { state: moodState, addEntry, setCurrentMood } = useMood();
+  const navigate = useNavigate();
   const { addNotification } = useApp();
   const [journalEntry, setJournalEntry] = useState('');
+  const [selectedMood, setSelectedMood] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [entries, setEntries] = useState<Array<{ _id?: string; title: string; content: string; mood?: string; createdAt: string }>>([]);
+
+  useEffect(() => {
+    const loadEntries = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const token = localStorage.getItem('mindflow_token');
+        const res = await fetch('/api/journal', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Failed to fetch journal entries');
+        const data = await res.json();
+        setEntries(
+          data.map((e: any) => ({
+            _id: e._id,
+            title: e.title,
+            content: e.content,
+            mood: e.mood,
+            createdAt: e.createdAt,
+          }))
+        );
+      } catch (e: any) {
+        setError(e.message || 'Failed to load entries');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadEntries();
+  }, []);
+
+  const playlistCategoryForMood = (m: string): string | null => {
+    const map: Record<string, string> = {
+      happy: 'happy',
+      sad: 'sad',
+      calm: 'calm',
+      excited: 'energetic',
+      anxious: 'calm',
+      neutral: 'focused',
+    };
+    if (map[m]) return map[m];
+    const allowed = ['happy','sad','calm','energetic','focused','sleep'];
+    return allowed.includes(m) ? m : null;
+  };
 
   const handleSave = async () => {
-    if (!moodState.currentMood || !journalEntry.trim()) {
+    if (!selectedMood || !journalEntry.trim()) {
       addNotification({
         type: 'warning',
         title: 'Incomplete Entry',
@@ -22,18 +70,50 @@ const Journal = () => {
     }
 
     try {
-      // Get mood intensity (simplified mapping)
-      const moodIntensity = getMoodIntensity(moodState.currentMood);
-      
-      await addEntry(moodState.currentMood, moodIntensity, journalEntry);
-      
-      setCurrentMood('');
+      setSaving(true);
+      const token = localStorage.getItem('mindflow_token');
+      const optimistic = {
+        _id: `temp_${Date.now()}`,
+        title: journalEntry.slice(0, 40) || 'Journal Entry',
+        content: journalEntry,
+        mood: selectedMood,
+        createdAt: new Date().toISOString(),
+      };
+      setEntries((prev) => [optimistic, ...prev]);
+
+      const res = await fetch('/api/journal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: optimistic.title, content: optimistic.content, mood: optimistic.mood }),
+      });
+
+      if (!res.ok) {
+        setEntries((prev) => prev.filter((e) => e._id !== optimistic._id));
+        throw new Error('Failed to save your entry');
+      }
+
+      const saved = await res.json();
+      setEntries((prev) => [
+        { _id: saved._id, title: saved.title, content: saved.content, mood: saved.mood, createdAt: saved.createdAt },
+        ...prev.filter((e) => e._id !== optimistic._id),
+      ]);
+
+      setSelectedMood('');
       setJournalEntry('');
-      
+
+      const cat = playlistCategoryForMood(saved?.mood || selectedMood);
       addNotification({
         type: 'success',
         title: 'Entry Saved!',
-        message: 'Your journal entry has been saved successfully.',
+        message: cat
+          ? `Want music to match your mood? Explore ${cat} playlists.`
+          : 'Your journal entry has been saved successfully.',
+        actions: cat
+          ? [{
+              label: `Open ${cat.charAt(0).toUpperCase() + cat.slice(1)} Playlists`,
+              action: () => navigate(`/playlist?category=${cat}`),
+            }]
+          : undefined,
       });
     } catch (error) {
       addNotification({
@@ -41,19 +121,12 @@ const Journal = () => {
         title: 'Save Failed',
         message: 'Failed to save your entry. Please try again.',
       });
+    } finally {
+      setSaving(false);
     }
   };
 
-  const getMoodIntensity = (mood: string): number => {
-    const intensityMap: Record<string, number> = {
-      happy: 8,
-      excited: 9,
-      neutral: 5,
-      sad: 3,
-      anxious: 4,
-    };
-    return intensityMap[mood] || 5;
-  };
+  const getMoodIntensity = (_mood: string): number => 0; // no longer used
 
   const journalPrompts = [
     "What made you smile today?",
@@ -82,7 +155,7 @@ const Journal = () => {
           <div className="lg:col-span-2 space-y-8">
             {/* Mood Selection */}
             <Card variant="default" className="p-6">
-              <MoodSelector onMoodSelect={setCurrentMood} selectedMood={moodState.currentMood} />
+              <MoodSelector onMoodSelect={setSelectedMood} selectedMood={selectedMood} />
             </Card>
 
             {/* Journal Entry */}
@@ -116,9 +189,9 @@ const Journal = () => {
                   <Button
                     onClick={handleSave}
                     variant="therapeutic"
-                    disabled={moodState.loading || !moodState.currentMood || !journalEntry.trim()}
+                    disabled={saving || !selectedMood || !journalEntry.trim()}
                   >
-                    {moodState.loading ? (
+                    {saving ? (
                       <div className="flex items-center">
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
                         Saving...
@@ -154,27 +227,39 @@ const Journal = () => {
             </Card>
 
             {/* Recent Entries */}
-            {moodState.entries.length > 0 && (
+            {loading ? (
+              <Card variant="default" className="p-6">
+                <h3 className="text-lg font-semibold text-foreground mb-4">Recent Entries</h3>
+                <div className="space-y-3">
+                  <div className="h-4 bg-muted rounded animate-pulse"></div>
+                  <div className="h-4 bg-muted rounded animate-pulse"></div>
+                  <div className="h-4 bg-muted rounded animate-pulse"></div>
+                </div>
+              </Card>
+            ) : entries.length > 0 ? (
               <Card variant="default" className="p-6">
                 <h3 className="text-lg font-semibold text-foreground mb-4">Recent Entries</h3>
                 <div className="space-y-3 max-h-64 overflow-y-auto">
-                  {moodState.entries.slice(0, 3).map((entry) => (
-                    <div key={entry.id} className="p-3 bg-muted rounded-xl">
+                  {entries.slice(0, 3).map((entry) => (
+                    <div key={entry._id} className="p-3 bg-muted rounded-xl">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-foreground capitalize">
-                          {entry.mood}
+                          {entry.mood || '—'}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {entry.date}
+                          {new Date(entry.createdAt).toLocaleString()}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground line-clamp-2">
-                        {entry.note}
+                        {entry.content}
                       </p>
                     </div>
                   ))}
                 </div>
               </Card>
+            ) : null}
+            {error && (
+              <p className="text-sm text-destructive">{error}</p>
             )}
           </div>
         </div>

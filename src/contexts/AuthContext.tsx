@@ -4,6 +4,7 @@ import React, { createContext, useContext, useReducer, useEffect } from 'react';
 interface User {
   id: string;
   email: string;
+  role?: 'user' | 'admin';
   name: string;
   avatar?: string;
   createdAt: string;
@@ -88,6 +89,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
 interface AuthContextType {
   state: AuthState;
   login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string) => Promise<void>;
   logout: () => void;
   updateUser: (updates: Partial<User>) => void;
   clearError: () => void;
@@ -123,14 +125,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     dispatch({ type: 'CLEAR_ERROR' });
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Mock user data
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Login failed');
+      }
+
+      const data = await res.json();
+      const token: string = data.token;
+      const basicUser = data.user as { id: string; email: string; role?: 'user' | 'admin' };
+
       const user: User = {
-        id: 'user_' + Date.now(),
-        email,
-        name: email.split('@')[0],
+        id: basicUser.id,
+        email: basicUser.email,
+        role: basicUser.role || 'user',
+        name: basicUser.email.split('@')[0],
         avatar: '',
         createdAt: new Date().toISOString(),
         preferences: {
@@ -140,12 +154,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         },
       };
 
-      // Store in localStorage
       localStorage.setItem('mindflow_user', JSON.stringify(user));
-      
+      localStorage.setItem('mindflow_token', token);
+
       dispatch({ type: 'LOGIN_SUCCESS', payload: user });
-    } catch (error) {
-      dispatch({ type: 'LOGIN_ERROR', payload: 'Login failed. Please try again.' });
+    } catch (error: any) {
+      dispatch({ type: 'LOGIN_ERROR', payload: error.message || 'Login failed. Please try again.' });
+    }
+  };
+
+  const register = async (email: string, password: string) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'CLEAR_ERROR' });
+
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Registration failed');
+      }
+
+      const data = await res.json();
+      const token: string = data.token;
+      const basicUser = data.user as { id: string; email: string; role?: 'user' | 'admin' };
+
+      const user: User = {
+        id: basicUser.id,
+        email: basicUser.email,
+        role: basicUser.role || 'user',
+        name: basicUser.email.split('@')[0],
+        avatar: '',
+        createdAt: new Date().toISOString(),
+        preferences: {
+          theme: 'system',
+          notifications: true,
+          reminderTime: '09:00',
+        },
+      };
+
+      localStorage.setItem('mindflow_user', JSON.stringify(user));
+      localStorage.setItem('mindflow_token', token);
+
+      dispatch({ type: 'LOGIN_SUCCESS', payload: user });
+    } catch (error: any) {
+      dispatch({ type: 'LOGIN_ERROR', payload: error.message || 'Registration failed. Please try again.' });
     }
   };
 
@@ -172,6 +229,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider value={{
       state,
       login,
+      register,
       logout,
       updateUser,
       clearError,

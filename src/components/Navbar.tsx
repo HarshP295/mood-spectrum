@@ -1,9 +1,11 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Heart, Home, BookOpen, BarChart3, MessageCircle, Music, Camera, User } from 'lucide-react';
+import { Heart, Home, BookOpen, BarChart3, MessageCircle, Music, Camera, User, LogOut } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import DarkModeToggle from './DarkModeToggle';
 
 const Navbar = () => {
   const location = useLocation();
+  const { state: authState, logout } = useAuth();
 
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
@@ -48,13 +50,35 @@ const Navbar = () => {
 
           {/* Profile & Dark Mode Toggle */}
           <div className="flex items-center space-x-4">
-            <Link
-              to="/login"
-              className="flex items-center space-x-2 px-4 py-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-all duration-300"
-            >
-              <User className="w-4 h-4" />
-              <span className="hidden sm:inline text-sm font-medium">Profile</span>
-            </Link>
+            {authState.isAuthenticated && authState.user ? (
+              <div className="flex items-center space-x-2">
+                <Link
+                  to="/dashboard"
+                  className="flex items-center space-x-2 px-4 py-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-all duration-300"
+                >
+                  <User className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm font-medium">
+                    {authState.user.name || authState.user.email}
+                  </span>
+                </Link>
+                <button
+                  onClick={logout}
+                  className="flex items-center space-x-2 px-3 py-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-all duration-300"
+                  aria-label="Logout"
+                  title="Logout"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <Link
+                to="/login"
+                className="flex items-center space-x-2 px-4 py-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-all duration-300"
+              >
+                <User className="w-4 h-4" />
+                <span className="hidden sm:inline text-sm font-medium">Login</span>
+              </Link>
+            )}
             <DarkModeToggle />
           </div>
         </div>

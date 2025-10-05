@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
 
 // Types
 export interface ChatMessage {
@@ -145,39 +145,79 @@ const ChatContext = createContext<ChatContextType | undefined>(undefined);
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(chatReducer, initialState);
 
-  // Simulate connection and load initial data
+  const wsRef = useRef<WebSocket | null>(null);
+  const currentRoomRef = useRef<string>(initialState.currentRoom);
+
+  // Connect WebSocket and handle events
   useEffect(() => {
-    const connect = async () => {
+    let retries = 0;
+    let timeout: any;
+
+    const connect = () => {
       dispatch({ type: 'SET_LOADING', payload: true });
-      
-      try {
-        // Simulate connection delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Load stored messages
-        const storedMessages = localStorage.getItem('mindflow_chat_messages');
-        if (storedMessages) {
-          const messages = JSON.parse(storedMessages);
-          dispatch({ type: 'LOAD_MESSAGES', payload: messages });
-        }
-        
+      const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const ws = new WebSocket(`${proto}://${window.location.host}/ws`);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        retries = 0;
         dispatch({ type: 'SET_CONNECTED', payload: true });
-        dispatch({ type: 'SET_ONLINE_USERS', payload: Math.floor(Math.random() * 20) + 10 });
-        
-        // Simulate online user count updates
-        const interval = setInterval(() => {
-          dispatch({ type: 'SET_ONLINE_USERS', payload: Math.floor(Math.random() * 20) + 10 });
-        }, 30000);
-        
-        return () => clearInterval(interval);
-      } catch (error) {
-        dispatch({ type: 'SET_ERROR', payload: 'Failed to connect to chat' });
-      } finally {
         dispatch({ type: 'SET_LOADING', payload: false });
-      }
+        // rejoin current room after reconnect
+        const roomId = currentRoomRef.current;
+        try { ws.send(JSON.stringify({ type: 'room.join', roomId })); } catch {}
+      };
+
+      ws.onmessage = (evt) => {
+        try {
+          const msg = JSON.parse(evt.data);
+          switch (msg.type) {
+            case 'welcome':
+              currentRoomRef.current = msg.roomId || currentRoomRef.current;
+              break;
+            case 'room.joined':
+              currentRoomRef.current = msg.roomId;
+              dispatch({ type: 'SET_CURRENT_ROOM', payload: msg.roomId });
+              break;
+            case 'room.count':
+              dispatch({ type: 'SET_ONLINE_USERS', payload: Number(msg.count || 0) });
+              break;
+            case 'chat.message':
+              if (msg.roomId === currentRoomRef.current && msg.message) {
+                const incoming = msg.message as any;
+                const normalized = {
+                  id: incoming.id,
+                  content: incoming.content,
+                  sender: incoming.sender === 'peer' ? 'peer' : 'peer',
+                  timestamp: incoming.timestamp,
+                } as any;
+                dispatch({ type: 'ADD_MESSAGE', payload: normalized });
+              }
+              break;
+            default:
+              break;
+          }
+        } catch {}
+      };
+
+      const scheduleReconnect = () => {
+        dispatch({ type: 'SET_CONNECTED', payload: false });
+        const delay = Math.min(30000, 1000 * Math.pow(2, retries));
+        retries += 1;
+        clearTimeout(timeout);
+        timeout = setTimeout(connect, delay);
+      };
+
+      ws.onclose = scheduleReconnect;
+      ws.onerror = scheduleReconnect;
     };
 
     connect();
+    return () => {
+      clearTimeout(timeout);
+      try { wsRef.current?.close(); } catch {}
+      wsRef.current = null;
+    };
   }, []);
 
   // Save messages to localStorage
@@ -189,32 +229,16 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const sendMessage = async (content: string) => {
     if (!content.trim()) return;
-    
-    try {
-      const userMessage: ChatMessage = {
-        id: 'msg_' + Date.now(),
-        content: content.trim(),
-        sender: 'user',
-        timestamp: Date.now(),
-      };
-      
-      dispatch({ type: 'ADD_MESSAGE', payload: userMessage });
-      
-      // Simulate peer response with delay
-      setTimeout(() => {
-        const response = mockResponses[Math.floor(Math.random() * mockResponses.length)];
-        const peerMessage: ChatMessage = {
-          id: 'msg_' + (Date.now() + 1),
-          content: response,
-          sender: 'peer',
-          timestamp: Date.now() + 1000,
-        };
-        
-        dispatch({ type: 'ADD_MESSAGE', payload: peerMessage });
-      }, 2000 + Math.random() * 3000);
-      
-    } catch (error) {
-      dispatch({ type: 'SET_ERROR', payload: 'Failed to send message' });
+    const userMessage: ChatMessage = {
+      id: 'msg_' + Date.now(),
+      content: content.trim(),
+      sender: 'user',
+      timestamp: Date.now(),
+    };
+    dispatch({ type: 'ADD_MESSAGE', payload: userMessage });
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'chat.message', content: content.trim() }));
     }
   };
 
@@ -228,7 +252,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const joinRoom = (roomId: string) => {
     dispatch({ type: 'SET_CURRENT_ROOM', payload: roomId });
-    // In a real app, this would load room-specific messages
+    currentRoomRef.current = roomId;
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'room.join', roomId }));
+    }
   };
 
   const addReaction = (messageId: string, emoji: string) => {

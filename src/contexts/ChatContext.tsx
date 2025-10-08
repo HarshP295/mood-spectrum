@@ -156,7 +156,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const connect = () => {
       dispatch({ type: 'SET_LOADING', payload: true });
       const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      const ws = new WebSocket(`${proto}://${window.location.host}/ws`);
+      const configuredWsUrl = (import.meta as any)?.env?.VITE_WS_URL as string | undefined;
+      const wsUrl = configuredWsUrl || `${proto}://${window.location.host}/ws`;
+      const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {

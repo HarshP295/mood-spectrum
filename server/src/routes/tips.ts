@@ -296,7 +296,7 @@ router.delete('/:id', authenticate, requireAdmin, async (req: any, res) => {
     // Broadcast to WebSocket clients
     try {
       const wsManager = getWebSocketManager();
-      wsManager.broadcastTipDeleted(tip._id.toString());
+      wsManager.broadcastTipDeleted(tip.id);
     } catch (wsError) {
       console.warn('WebSocket broadcast failed:', wsError);
     }

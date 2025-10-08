@@ -63,14 +63,14 @@ const UserSchema = new Schema<IUser>({
   timestamps: true,
   toJSON: {
     transform: function(doc, ret) {
-      delete ret.password;
+      // delete ret.password;
+      delete (ret as any).password;
       return ret;
     }
   }
 });
 
 // Index for better query performance
-UserSchema.index({ email: 1 });
 UserSchema.index({ role: 1 });
 
 export default mongoose.model<IUser>('User', UserSchema);

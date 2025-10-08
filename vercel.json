@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://mood-spectrum.onrender.com/api/:path*" },
+    { "source": "/ws", "destination": "https://mood-spectrum.onrender.com/ws" }
+  ]
+}

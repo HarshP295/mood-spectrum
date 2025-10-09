@@ -2,9 +2,12 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import jwt from 'jsonwebtoken';
 
-interface AuthenticatedWebSocket extends WebSocket {
+type AuthenticatedWebSocket = WebSocket & {
   userId?: string;
   roomId?: string;
+  readyState: WebSocket['readyState'];
+  send: WebSocket['send'];
+  on: WebSocket['on'];
 }
 
 interface WebSocketMessage {

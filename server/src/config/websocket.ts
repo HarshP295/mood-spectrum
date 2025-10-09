@@ -1,5 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import { Server } from 'http';
+import type { Server } from 'node:http';
 import jwt from 'jsonwebtoken';
 
 type AuthenticatedWebSocket = WebSocket & {

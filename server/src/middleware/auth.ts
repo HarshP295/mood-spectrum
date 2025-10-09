@@ -4,6 +4,9 @@ import User, { IUser } from '../models/User';
 
 interface AuthRequest extends Request {
   user?: IUser;
+  headers: {
+    authorization?: string;
+  } & Request['headers'];
 }
 
 export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction) => {
